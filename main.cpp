@@ -5,113 +5,141 @@
 
 using namespace std;
 
-double Distanse(vector<Vector3d> array, pair<int, Vector3d> prob)
-{
-    Vector3d p1 = array[prob.first];
-    Vector3d p2 = prob.second;
-    double dx = 1e9, dy = 1e9;
-    double dz = abs(p1.z - p2.z);
-    for(int i = -1000; i <= 1000; i++) {
-        dx = min(dx, abs(p1.x - p2.x + i));
-        dy = min(dy, abs(p1.y - p2.y + i));
-    }
+//globals
+vector<Vector3d> points;
 
-    return sqrt(dx*dx + dy*dy + dz*dz);
+
+/**
+ * @param a, b, c - input vectors
+ * @return  local optimum for placing next vector
+ * @brief Method solves the equation: (x - x1)^2 + (y - y1)^2 + (H - z1)^2 = (x - x2)^2 + (y - y2)^2 + (H - z2)^2 =
+ * (x - x3)^2 + (y - y3)^2 + (H - z3)^2, where x_i, y_i, z_i - coordinates of each given vector
+ */
+pair<Vector3d, double> SolveForThree(Vector3d a, Vector3d b, Vector3d c, double H)
+{
+       double A, B, C, D, E, F;
+       A = 2 * (b.x - a.x);
+       B = 2 * (b.y - a.y);
+       C = pow(H - b.z, 2) - pow(H - a.z, 2) + pow(b.x, 2) -
+               pow(a.x, 2) + pow(b.y, 2) - pow(a.y, 2);
+
+       D = 2 * (c.x - a.x);
+       E = 2 * (c.y - a.y);
+       F = pow(H - c.z, 2) - pow(H - a.z, 2) + pow(c.x, 2) -
+        pow(a.x, 2) + pow(c.y, 2) - pow(a.y, 2);
+
+       double x, y;
+       x = (C * B - F * E) / (A * E - D * B);
+       y = (A * F - D * C) / (A * E - D * B);
+       return {Vector3d(x, y, H), sqrt(pow(y - a.y, 2) + pow(H - a.z, 2))};
 }
 
-Vector3d ArgMin(vector<Vector3d> array, vector<pair<vector<int>, Vector3d> > candidates)
+
+pair<Vector3d, double> FindOpt(int _a, int _b, int _c, double H)
 {
-    Vector3d cand;
-    double dist = 1e9, newD, newD1, newD2;
-    for(auto i: candidates)
+    vector<Vector3d> knownPoints;
+    knownPoints.emplace_back(points[_a]);
+    knownPoints.emplace_back(points[_b]);
+    knownPoints.emplace_back(points[_c]);
+
+    /** duplicating by modulo 2 */
+    for(int i = 0; i < 3; i++)
     {
-        pair<int, Vector3d> ff, ss, tt;
-        ff.first = i.first[0];
-        ff.second = i.second;
-
-        ss.first = i.first[1];
-        ss.second = i.second;
-
-        tt.first = i.first[2];
-        tt.second = i.second;
-
-        newD = Distanse(array, ff);
-        newD1 = Distanse(array, ss);
-        newD2 = Distanse(array, tt);
-        //cout << "candidate " << newD << ' ' << newD1 << ' ' << newD2 << '\n';
-        if(newD < dist)
-        {
-            dist = newD;
-            cand = i.second;
-        }
+        double x = knownPoints[i].x, y = knownPoints[i].y, z = knownPoints[i].z;
+        knownPoints.emplace_back(Vector3d(x+1, y, z));
+        knownPoints.emplace_back(Vector3d(x + 1, y+1, z));
+        knownPoints.emplace_back(Vector3d(x, y + 1, z));
+        knownPoints.emplace_back(Vector3d(x - 1, y + 1, z));
+        knownPoints.emplace_back(Vector3d(x - 1, y, z));
+        knownPoints.emplace_back(Vector3d(x - 1, y - 1, z));
+        knownPoints.emplace_back(Vector3d(x, y - 1, z));
+        knownPoints.emplace_back(Vector3d(x + 1, y - 1, z));
     }
-    return cand;
+    /**
+     * main loop
+     */
+    int capacity = knownPoints.size();
+    pair <Vector3d, double> candidate;
+    Vector3d ans;
+    double minDist = 1e9;
+    for(int a = 0; a < capacity; a++)
+        for (int b = a + 1; b < capacity; b++)
+            for (int c = b + 1; c < capacity; c++)
+            {
+                candidate = SolveForThree(knownPoints[a], knownPoints[b], knownPoints[c], H);
+                if(candidate.first.x < 0 || candidate.first.x >= 1 || candidate.first.y < 0 || candidate.first.y >= 1)
+                    continue;
+
+                if(candidate.second < minDist)
+                {
+                    minDist = candidate.second;
+                    ans = candidate.first;
+                }
+            }
+
+    return {ans, minDist};
 }
+
 
 
 int main()
 {
-    //freopen("data.txt", "w", stdout);
-    double h = 0.2;
-    vector<Vector3d> array;
-    array.emplace_back(Vector3d(0, 0, 0));
-    array.emplace_back(0.5, 0.5, h);
+    freopen("data.txt", "w", stdout);
+    double h = 0.02;
+
+    /**
+     * initial points
+     */
+    points.emplace_back(Vector3d(0, 0, 0));
+    points.emplace_back(0.5, 0.5, h);
     if(h > sqrt(1./2))
     {
         cout << "too large h";
         return 0;
     }
-    //array.emplace_back(0, 1 - sqrt(h*h + 1.0 / 2) * sqrt(1 + 2 * h * h) / sqrt(2) , 2 * h);
     double y = (1./2 - 3 * h*h)/sqrt(2);
-    //double z = 1/sqrt(2) - y;
     double p = y * sqrt(2);
-    array.emplace_back(0, p, 2 * h);
-    //array.emplace_back(1.0/2 - sqrt(h*h + 1.0 / 2) * sqrt(1 + 2 * h * h) / 2 / sqrt(2), 1./2 - sqrt(h*h + 1.0 / 2) * sqrt(1 + 2 * h * h) / 2 / sqrt(2) , 2 * h);
+    points.emplace_back(0, p, 2 * h);
 
-    //cout << Distanse(array, {0, array[1]}) << '\n';
-    //cout << Distanse(array, {0, array[2]}) << '\n';
-    //cout << Distanse(array, {1, array[2]}) << '\n';
-    int N = 1000;
+    /**
+     * main loop
+     */
+    int N = 25;
     for(int i = 3; i <= N; i++)
     {
-        vector<pair<vector<int>, Vector3d> > candidates;
-        Vector3d prob;
-        int capacity = array.size();
+        vector<pair<Vector3d, int> > candidates;
+        int capacity = points.size();
         for(int a = 0; a < capacity; a++) {
             if((i-a)*h > 2 * sqrt(1.0/sqrt(2) + h*h))
                 continue;
             for (int b = a + 1; b < capacity; b++)
                 for (int c = b + 1; c < capacity; c++) {
-                    Plane3d p1 = Plane3d::midplane(array[a], array[b]);
-                    Plane3d p2 = Plane3d::midplane(array[a], array[c]);
-                    Plane3d p3 = Plane3d(0, 0, 1, i * h);
-                    prob = Plane3d::intersection(p1, p2, p3);
-//                    prob.x = prob.x - (long long) prob.x;
-//                    prob.y = prob.y - (long long) prob.y;
-//                    if(prob.x < 0) prob.x+=1;
-//                    if(prob.y < 0) prob.y+=1;
-                    //if (0 <= prob.x && prob.x < 1 && 0 <= prob.y && prob.y < 1)
-                    vector<int> abc = {a, b, c};
-                    candidates.emplace_back(make_pair(abc, prob));
-
+                    candidates.emplace_back(FindOpt(a, b, c, i * h));
                 }
         }
-        prob = ArgMin(array, candidates);
-        prob.x = prob.x - (long long) prob.x;
-        prob.y = prob.y - (long long) prob.y;
-        if(prob.x < 0) prob.x+=1;
-        if(prob.y < 0) prob.y+=1;
-        array.emplace_back(prob);
+        double minDist = 1e9;
+        Vector3d next;
+        for(auto i: candidates)
+        {
+            if(i.second < minDist)
+            {
+                minDist = i.second;
+                next = i.first;
+            }
+        }
+        points.emplace_back(next);
+        cerr << i << endl;
     }
-    for(int i = 1; i < array.size(); i++)
+    for(int i = 1; i < points.size(); i++)
     {
-
-        double dx = abs(array[i-1].x - array[i].x);
-        double dy = abs(array[i-1].y - array[i].y);
-//        dx = min(dx, 1 - dx);
-//        dy = min(dy, 1 - dy);
-        cout << dx << " " << dy << " " << array[i].z << '\n';
+        double dx = abs(points[i].x - points[i-1].x);
+        double dy = abs(points[i].x - points[i-1].x);
+        dx = min(dx, 1 - dx);
+        dy = min(dy, 1 - dy);
+        cout << dx << ' ' << dy << ' ' << points[i].z << '\n';
     }
+
+
 
 
 
