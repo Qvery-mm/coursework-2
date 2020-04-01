@@ -8,5 +8,7 @@ For more details see **report.pdf**
 
 
 related repos:
+
 https://github.com/Qvery-mm/cgal (3d geomery)
+
 https://github.com/Qvery-mm/analysis (2d geomery)
